@@ -5,16 +5,54 @@ pub fn evaluate(expression: String) -> i64{
         return i64::MAX; 
     }
 
+    return calculate(&mut symbol_line);
+}
+
+pub fn calculate(symbol_line: &mut Vec<Symbol>) -> i64{
+    while symbol_line.contains(&Symbol::LParen){
+        //replaces range between parentheses with a calculated number
+        let l_paren_index = symbol_line.iter().position(|x| x == &Symbol::LParen).unwrap();
+        let r_paren_index = find_matching_paren(symbol_line, l_paren_index);
+
+        let number = calculate(&mut (symbol_line[l_paren_index..r_paren_index]).to_vec());
+
+        symbol_line.drain(l_paren_index..r_paren_index);
+        symbol_line.insert(l_paren_index, Symbol::Number(number));
+    }
+
+
     return 1;
 }
 
+#[allow(unused_assignments)]
 fn tokenize(expression: String) -> Vec<Symbol>{
-    return expression.split(' ').map(|x| Symbol::to_symbol(x.to_string())).collect();
+    //return expression.split(' ').map(|x| Symbol::to_symbol(x.to_string())).collect();
+    let mut result: Vec<Symbol> = vec![];
+    let mut number: String = "".to_string();
+    let mut tokenizing_number: bool = false;
+
+    for symbol in expression.chars().filter(|c| !c.is_whitespace()){
+        if !symbol.is_numeric() && tokenizing_number{
+            tokenizing_number = false;
+            result.push(Symbol::to_symbol(number));
+            number = "".to_string();
+        }
+
+        if symbol.is_numeric(){
+            number.push(symbol);
+            tokenizing_number = true;
+        } else {
+            result.push(Symbol::to_symbol(symbol.to_string()));
+            tokenizing_number = false;
+        }
+    }
+
+    return result;
 }
 
 #[allow(dead_code)]
-#[derive(PartialEq)]
-enum Symbol{
+#[derive(PartialEq, Clone)]
+pub enum Symbol{
     Plus,
     Minus,
     Multi,
@@ -120,4 +158,43 @@ fn check_pair(first_list: Vec<Symbol>, second_list: Vec<Symbol>, expression: &Ve
     }
 
     return true;
+}
+
+//finds the index of a matching parenthesis
+fn find_matching_paren(symbols: &Vec<Symbol>, lparen_index: usize) -> usize{
+    let (mut to_skip, mut i) = (0, lparen_index + 1);
+
+    for symbol in symbols[lparen_index+1..].iter(){
+        if symbol == &Symbol::LParen{
+            to_skip += 1;
+        } else if symbol == &Symbol::RParen && to_skip != 0{
+            to_skip -= 1;
+        } else if symbol == &Symbol::RParen && to_skip == 0{
+            return i;
+        }
+
+        i += 1;
+    }
+    return 0;
+}
+
+fn colapse_sequential_operands(symbol_line: &mut Vec<Symbol>){
+    let (mut plus_count, mut minus_count, index) = (0, 0, 0);
+    for symbol in symbol_line{
+        match symbol{ 
+            &mut Symbol::Plus => plus_count += 1,
+            &mut Symbol::Minus => minus_count += 1,
+            _ => (plus_count, minus_count) = (0, 0),
+        }
+        
+        if plus_count > 0 && minus_count > 0{
+            if minus_count % 2 == 0{
+
+            }
+        }
+    }
+}
+
+fn collapse() -> Symbol{
+    return Symbol::Number(0);
 }
