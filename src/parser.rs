@@ -1,20 +1,23 @@
 // 1.()   2. ^   3. * / %   4. + -
-pub fn evaluate(expression: String) -> i64{
+pub fn evaluate(expression: String) -> String{
     let mut symbol_line = tokenize(expression);
     if !valid_parentheses(&symbol_line) || !pre_check(&mut symbol_line){
-        return i64::MAX; 
+        return "Invalid calculation".to_string(); 
     }
 
-    return calculate(&mut symbol_line);
+    match calculate(&mut symbol_line){
+        Some(x) => x.to_string(),
+        None => "Invalid calculation".to_string(),
+    }
 }
 
-pub fn calculate(symbol_line: &mut Vec<Symbol>) -> i64{
+pub fn calculate(symbol_line: &mut Vec<Symbol>) -> Option<i64>{
     while symbol_line.contains(&Symbol::LParen){
         //replaces range between parentheses with a calculated number
         let l_paren_index = symbol_line.iter().position(|x| x == &Symbol::LParen).unwrap();
         let r_paren_index = find_matching_paren(symbol_line, l_paren_index);
 
-        let number = calculate(&mut (symbol_line[l_paren_index + 1..=r_paren_index - 1]).to_vec());
+        let number = calculate(&mut (symbol_line[l_paren_index + 1..=r_paren_index - 1]).to_vec()).unwrap();
 
         symbol_line.drain(l_paren_index..=r_paren_index);
         symbol_line.insert(l_paren_index, Symbol::Number(number));
@@ -63,9 +66,9 @@ pub fn calculate(symbol_line: &mut Vec<Symbol>) -> i64{
     }
 
      match symbol_line.get(0).unwrap(){
-        Symbol::Number(x) => return *x,
-        _ => panic!("Invalid calculation"),
-    };
+        Symbol::Number(x) => Some(*x),
+        _ => None,
+    }
 }
 
 #[allow(unused_assignments)]
