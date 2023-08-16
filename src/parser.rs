@@ -14,14 +14,58 @@ pub fn calculate(symbol_line: &mut Vec<Symbol>) -> i64{
         let l_paren_index = symbol_line.iter().position(|x| x == &Symbol::LParen).unwrap();
         let r_paren_index = find_matching_paren(symbol_line, l_paren_index);
 
-        let number = calculate(&mut (symbol_line[l_paren_index..r_paren_index]).to_vec());
+        let number = calculate(&mut (symbol_line[l_paren_index + 1..=r_paren_index - 1]).to_vec());
 
-        symbol_line.drain(l_paren_index..r_paren_index);
+        symbol_line.drain(l_paren_index..=r_paren_index);
         symbol_line.insert(l_paren_index, Symbol::Number(number));
     }
 
+    colapse_sequential_operands(symbol_line); 
 
-    return 1;
+    let mut index = 0;
+    // ^
+    for symbol in symbol_line.clone(){
+        if symbol == Symbol::Exp{
+            let new_number = collapse(symbol_line[index - 1].clone(), symbol, symbol_line[index + 1].clone());
+            symbol_line.drain(index - 1..=index + 1);
+            symbol_line.insert(index - 1, new_number);
+            index -= 1;
+            continue;
+        }
+
+        index += 1;
+    } 
+    index = 0;
+    // * / %
+    for symbol in symbol_line.clone(){
+        if symbol == Symbol::Multi || symbol == Symbol::Div || symbol == Symbol::Remainder{
+            let new_number = collapse(symbol_line[index - 1].clone(), symbol, symbol_line[index + 1].clone());
+            symbol_line.drain(index - 1..=index + 1);
+            symbol_line.insert(index - 1, new_number);
+            index -= 1;
+            continue;
+        }
+
+        index += 1;
+    }
+    index = 0;
+    // + -
+    for symbol in symbol_line.clone(){
+        if symbol == Symbol::Plus || symbol == Symbol::Minus{
+            let new_number = collapse(symbol_line[index - 1].clone(), symbol, symbol_line[index + 1].clone());
+            symbol_line.drain(index - 1..=index + 1);
+            symbol_line.insert(index - 1, new_number);
+            index -= 1;
+            continue;
+        }
+
+        index += 1;
+    }
+
+     match symbol_line.get(0).unwrap(){
+        Symbol::Number(x) => return *x,
+        _ => panic!("Invalid calculation"),
+    };
 }
 
 #[allow(unused_assignments)]
@@ -47,11 +91,15 @@ fn tokenize(expression: String) -> Vec<Symbol>{
         }
     }
 
+    if !number.is_empty(){
+        result.push(Symbol::to_symbol(number));
+    }
+
     return result;
 }
 
 #[allow(dead_code)]
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum Symbol{
     Plus,
     Minus,
@@ -78,8 +126,8 @@ impl Symbol{
             "/" => Symbol::Div,
             "%" => Symbol::Remainder,
             "^" => Symbol::Exp,
-            "(" => Symbol::RParen,
-            ")" => Symbol::LParen,
+            "(" => Symbol::LParen,
+            ")" => Symbol::RParen,
             _ => Symbol::Invalid,
         }
     }
@@ -88,6 +136,10 @@ impl Symbol{
 fn valid_parentheses(expression: &Vec<Symbol>) -> bool{
     let mut paren_count: i16 = 0;
     let mut next_bad: bool = false;
+
+    if !expression.contains(&Symbol::RParen) && !expression.contains(&Symbol::LParen){
+        return true;
+    }
 
     for symbol in expression{
         //keeps track of current open parentheses also checks if there are no empty parentheses
@@ -133,9 +185,7 @@ fn pre_check(expression: &mut Vec<Symbol>) -> bool{
         Symbol::Plus => {
             expression.remove(0);
         },
-        _ => {
-            return false;
-        },
+        _ => {},
     }
 
     return check_pair(vec![Symbol::Multi, Symbol::Div, Symbol::Remainder, Symbol::Exp, Symbol::Plus, Symbol::Minus],
@@ -179,22 +229,46 @@ fn find_matching_paren(symbols: &Vec<Symbol>, lparen_index: usize) -> usize{
 }
 
 fn colapse_sequential_operands(symbol_line: &mut Vec<Symbol>){
-    let (mut plus_count, mut minus_count, index) = (0, 0, 0);
-    for symbol in symbol_line{
-        match symbol{ 
-            &mut Symbol::Plus => plus_count += 1,
-            &mut Symbol::Minus => minus_count += 1,
-            _ => (plus_count, minus_count) = (0, 0),
-        }
-        
-        if plus_count > 0 && minus_count > 0{
-            if minus_count % 2 == 0{
-
+    let mut previous = Symbol::Invalid;
+    let mut index = 0;
+    for symbol in symbol_line.clone(){
+        if (symbol == Symbol::Plus || symbol == Symbol::Minus) && (previous == Symbol::Plus || previous == Symbol::Minus){
+            if (symbol == Symbol::Minus || previous == Symbol::Minus) && symbol != previous{
+                symbol_line.drain(index - 1..=index);
+                symbol_line.insert(index - 1, Symbol::Minus);
+                previous = Symbol::Minus;
+            } else {
+                symbol_line.drain(index - 1..=index);
+                symbol_line.insert(index - 1, Symbol::Plus);
+                previous = Symbol::Plus
             }
+            continue;
         }
+
+        index += 1;
+        previous = symbol.clone();
     }
 }
 
-fn collapse() -> Symbol{
-    return Symbol::Number(0);
+fn collapse(first_number: Symbol, operand: Symbol, second_number: Symbol) -> Symbol{
+    let first_number_integer: i64;
+    let second_number_integer: i64;
+
+    match(first_number, second_number){
+        (Symbol::Number(x), Symbol::Number(y)) => {
+            first_number_integer = x;
+            second_number_integer = y;
+        },
+        _ => return Symbol::Invalid,
+    }
+
+    return Symbol::Number(match operand{
+        Symbol::Plus => first_number_integer + second_number_integer,
+        Symbol::Minus => first_number_integer - second_number_integer,
+        Symbol::Multi => first_number_integer * second_number_integer,
+        Symbol::Div => first_number_integer / second_number_integer,
+        Symbol::Remainder => first_number_integer % second_number_integer,
+        Symbol::Exp => first_number_integer.pow(second_number_integer as u32),
+        _ => 0,
+    });
 }
